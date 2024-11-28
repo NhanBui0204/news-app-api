@@ -1,4 +1,3 @@
-
 from rest_framework.response import Response
 from rest_framework import status
 from functools import wraps
@@ -17,11 +16,11 @@ def auth_middleware(view_func):
             return failure_response(message="Missing or invalid Authorization header", status_code=status.HTTP_401_UNAUTHORIZED)
 
         token = auth_header.split(" ")[1]
-
         if not token:
             return failure_response(message="Access token missing", status_code=status.HTTP_401_UNAUTHORIZED)
+
         try:
-            if get_cache(f'access_token:{token}') == None:
+            if get_cache(f'access_token:{token}') is None:
                 return failure_response(message="Invalid token", status_code=status.HTTP_401_UNAUTHORIZED)
 
             decoded = jwt.decode(
@@ -37,9 +36,10 @@ def auth_middleware(view_func):
             }
 
             return view_func(request, *args, **kwargs)
+
         except jwt.ExpiredSignatureError:
-            return failure_response(message="Token expire", status_code=status.HTTP_401_UNAUTHORIZED)
-        except jwt.InvalidTokenError as e:
-            return failure_response(message="Token invalid", status_code=status.HTTP_401_UNAUTHORIZED)
+            return failure_response(message="Token expired", status_code=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return failure_response(message="Invalid token", status_code=status.HTTP_401_UNAUTHORIZED)
 
     return wrapper
