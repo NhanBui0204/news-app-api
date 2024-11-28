@@ -15,6 +15,7 @@ import jwt
 from PythonWeb.settings import JWT_SECRET
 from datetime import datetime, timedelta, timezone
 from django.core.exceptions import ObjectDoesNotExist
+from django.shortcuts import get_object_or_404
 
 
 @swagger_auto_schema(
@@ -24,7 +25,7 @@ from django.core.exceptions import ObjectDoesNotExist
     request_body=AuthSerializer,
     responses={
         200: openapi.Response(
-            "Success", examples={"application/json": {"message": "Hello world"}}
+            "Success", examples={"application/json": {"message": "Success"}}
         ),
         400: openapi.Response(
             "Validation Error", examples={"application/json": {"error": "Invalid input"}}
@@ -79,8 +80,7 @@ def login(request, *args, **kwargs):
     operation_description="Register account",
     tags=["Auth"],
     request_body=RegisterSerializer,
-    responses={
-    },
+    responses={},
     security=[]
 )
 @api_view(['POST'])
@@ -92,59 +92,44 @@ def register(request, *args, **kwargs):
 
     email = serializer.validated_data['email']
     password = serializer.validated_data['password']
-    first_name = serializer.validated_data['first_name']
-    last_name = serializer.validated_data['last_name']
-    user_name = serializer.validated_data['user_name']
 
     user = User.objects.filter(email=email).first()
     if user:
-        return failure_response(message='Email is existed', status_code=status.HTTP_409_CONFLICT)
+        return failure_response(message='Email is already taken', status_code=status.HTTP_409_CONFLICT)
 
     new_user = User(
         email=email,
-        is_staff=False,
-        first_name=first_name,
-        last_name=last_name,
-        username=user_name
+        is_staff=False
     )
-
     new_user.set_password(password)
     new_user.save()
-    new_user_data = UserSerializers(new_user).data
 
-    return success_response(data=new_user_data)
-
+    user_data = UserSerializers(new_user).data
+    return success_response(data=user_data)
 
 @swagger_auto_schema(
     method='PATCH',
     operation_description="Update profile",
     tags=["Auth"],
     request_body=UpdateUserSerializer,
-    responses={
-    },
+    responses={},
     security=[{"Bearer": []}],
 )
 @swagger_auto_schema(
     method='GET',
     operation_description="Get profile",
     tags=["Auth"],
-    responses={
-    },
+    responses={},
     security=[{"Bearer": []}],
 )
 @api_view(['GET', 'PATCH'])
 @auth_middleware
 def profile_view(request, *args, **kwargs):
-
     user_id = request.user['id']
 
     if request.method == 'GET':
-
-        user = User.objects.filter(id=user_id).first()
-        if not user:
-            return failure_response(message='Not found User', status_code=status.HTTP_404_NOT_FOUND)
+        user = get_object_or_404(User, id=user_id)
         user_data = UserDataSerializer(user).data
-
         return Response(data=user_data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
@@ -152,36 +137,30 @@ def profile_view(request, *args, **kwargs):
         if not serializer.is_valid():
             raise ValidationError(serializer.errors)
 
-        first_name = serializer.validated_data['first_name']
-        last_name = serializer.validated_data['last_name']
-        username = serializer.validated_data['username']
+        first_name = serializer.validated_data.get('first_name')
+        last_name = serializer.validated_data.get('last_name')
+        user_name = serializer.validated_data.get('user_name')
 
-        user = User.objects.filter(id=user_id).first()
-        if not user:
-            return failure_response(message="Not found user", status_code=status.HTTP_404_NOT_FOUND)
-
+        user = get_object_or_404(User, id=user_id)
         user.first_name = first_name
         user.last_name = last_name
-        user.username = username
+        user.username = user_name
         user.save()
 
         return Response(status=status.HTTP_200_OK, data=UserDataSerializer(user).data)
-
 
 @swagger_auto_schema(
     method='PATCH',
     operation_description="Change password",
     tags=["Auth"],
     request_body=ChangePasswordSerializer,
-    responses={
-    },
+    responses={},
     security=[{"Bearer": []}],
 )
 @api_view(['PATCH'])
 @auth_middleware
 def change_password(request, *args, **kwargs):
     serializer = ChangePasswordSerializer(data=request.data)
-
     if not serializer.is_valid():
         raise ValidationError(serializer.errors)
 
@@ -193,61 +172,55 @@ def change_password(request, *args, **kwargs):
     try:
         decoded = decode_token(refresh_token)
     except jwt.ExpiredSignatureError:
-        return failure_response(message="Refresh Token expire", status_code=status.HTTP_401_UNAUTHORIZED)
-    except jwt.InvalidTokenError as e:
-        return failure_response(message="Refresh Token invalid", status_code=status.HTTP_401_UNAUTHORIZED)
+        return failure_response(message="Refresh Token expired", status_code=status.HTTP_401_UNAUTHORIZED)
+    except jwt.InvalidTokenError:
+        return failure_response(message="Invalid Refresh Token", status_code=status.HTTP_401_UNAUTHORIZED)
 
-    user = User.objects.filter(id=user_id).first()
-    if not user:
-        return failure_response(message='User not found', status_code=status.HTTP_401_UNAUTHORIZED)
+    user = get_object_or_404(User, id=user_id)
 
     if not user.check_password(current_password):
-        return failure_response(message='Current password is incorrect', status_code=status.HTTP_404_NOT_FOUND)
-
-    old_refresh_token = RefreshToken.objects.filter(user_id=user_id).first()
-    old_refresh_token.token = generate_refresh_token(user_id)
-    old_refresh_token.save()
+        return failure_response(message='Current password is incorrect', status_code=status.HTTP_400_BAD_REQUEST)
 
     user.set_password(new_password)
     user.save()
 
-    user_data = UserSerializers(user).data
-    user_data['password'] = new_password
+    old_refresh_token = get_object_or_404(RefreshToken, user_id=user_id)
+    old_refresh_token.token = generate_refresh_token(user_id)
+    old_refresh_token.save()
 
+    user_data = UserDataSerializer(user).data
     return success_response(status=status.HTTP_200_OK, data=user_data)
-
 
 @swagger_auto_schema(
     method='POST',
     operation_description="Refresh access token",
     request_body=RefreshTokenSerializer,
     tags=["Auth"],
-    responses={
-    },
+    responses={},
     security=[{"Bearer": []}],
 )
 @api_view(['POST'])
 def refresh_token(request, *args, **kwargs):
     serializer = RefreshTokenSerializer(data=request.data)
-
     if not serializer.is_valid():
         return failure_response(data=serializer.errors)
+
     refresh_token = serializer.validated_data['refresh_token']
 
-    old_refresh_token = RefreshToken.objects.filter(
-        token=refresh_token).first()
+    old_refresh_token = RefreshToken.objects.filter(token=refresh_token).first()
     if not old_refresh_token:
         return failure_response(status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid refresh token")
 
     try:
         decoded = decode_token(refresh_token)
-        user = User.objects.filter(id=decoded['id']).first()
-        new_access_token = generate_access_token(
-            id=decoded['id'], role=user.is_staff)
+        user = get_object_or_404(User, id=decoded['id'])
+        new_access_token = generate_access_token(id=decoded['id'], role=user.is_staff)
+        
         set_cache(f'access_token:{new_access_token}', new_access_token, 6000)
 
         return success_response(status_code=200, data={"new_access_token": new_access_token})
+
     except jwt.ExpiredSignatureError:
-        return failure_response(message="Refresh Token expire", status_code=status.HTTP_401_UNAUTHORIZED)
-    except jwt.InvalidTokenError as e:
-        return failure_response(message="Refresh Token invalid", status_code=status.HTTP_401_UNAUTHORIZED)
+        return failure_response(message="Refresh Token expired", status_code=status.HTTP_401_UNAUTHORIZED)
+    except jwt.InvalidTokenError:
+        return failure_response(message="Invalid Refresh Token", status_code=status.HTTP_401_UNAUTHORIZED)
