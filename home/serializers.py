@@ -23,10 +23,12 @@ class ContentSerializer(serializers.ModelSerializer):
     
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(),
-        source='category',
+        source='category', 
         write_only=True
     )
+
     image_url = serializers.URLField(required=False, allow_null=True)
+    image_file = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Content
@@ -34,6 +36,7 @@ class ContentSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'image_url',  
+            'image_file',
             'content',
             'author',
             'created_date',
@@ -45,8 +48,13 @@ class ContentSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         image_url = data.get('image_url')
-        if not image_url:
-            raise serializers.ValidationError("Cần cung cấp một URL hợp lệ cho ảnh.")
+        image_file = data.get('image_file')
+
+        if image_url and image_file:
+            raise serializers.ValidationError("Chỉ được cung cấp một trong hai: image_url hoặc image_file.")
+        
+        if not image_url and not image_file:
+            raise serializers.ValidationError("Cần phải cung cấp ít nhất một trong hai: image_url hoặc image_file.")
 
         return data
     

@@ -3,9 +3,10 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 import uuid
 import datetime
+from django.core.exceptions import ValidationError
 
 class User( AbstractUser):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)  
+    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)  
     avatar = models.URLField(max_length=200, blank=True, null=True)
     email = models.CharField(max_length=255, null=False, unique=True)
     name = models.CharField(max_length=255, null=False, default="")
@@ -24,7 +25,7 @@ class User( AbstractUser):
 
 
 class Category(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
+    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
     name = models.CharField(max_length=100)
     description = models.TextField(null=True, blank=True)
     created_date = models.DateTimeField(default=timezone.now)
@@ -35,7 +36,7 @@ class Category(models.Model):
 
 
 class SubCategory(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
+    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
     sub = models.CharField(max_length=255, null=False)
     description = models.TextField(null=True, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
@@ -47,22 +48,30 @@ class SubCategory(models.Model):
         return f"{self.sub} ({self.category.name if self.category else 'No Category'})"
 
 class Content(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
+    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255, null=False)
     image_url = models.URLField(max_length=200, blank=True, null=True)  
+    image_file = models.ImageField(upload_to='images/', blank=True, null=True)  
     content = models.TextField()
     author = models.TextField(null=True, blank=True)
-    created_date = models.DateTimeField(auto_now_add=True)
+    created_date = models.DateTimeField(auto_now_add=True)  
     updated_date = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
-    subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
+    subcategory = models.ForeignKey('SubCategory', on_delete=models.CASCADE)
+    category = models.ForeignKey('Category', on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.title
 
+    def clean(self):
+      
+        if self.image_url and self.image_file:
+            raise ValidationError("Chỉ được chọn một trong hai: image_url hoặc image_file.")
+        if not self.image_url and not self.image_file:
+            raise ValidationError("Cần phải chọn ít nhất một trong hai: image_url hoặc image_file.")
+
 class Comment(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
+    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
     title = models.TextField(default="No title") 
     author = models.CharField(max_length=255, null=True, blank=True)  
     created_date = models.DateTimeField(auto_now_add=True)  
