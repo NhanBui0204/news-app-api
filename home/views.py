@@ -3,6 +3,8 @@ from drf_yasg import openapi
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+
+from auths import serializers
 from .models import Category, SubCategory, Content, Comment
 from .serializers import CategorySerializer, SubCategorySerializer, ContentSerializer, CommentSerializer
 
@@ -234,16 +236,52 @@ def content_detail(request, pk):
 @swagger_auto_schema(
     method='post',
     request_body=ContentSerializer,
-    responses={201: ContentSerializer, 400: "Invalid input"}
+    responses={
+        201: openapi.Response("Content successfully created", ContentSerializer),
+        400: openapi.Response("Invalid input data"),
+    }
 )
 @api_view(['POST'])
 def content_create_by_subcategory(request):
+    """
+    API để tạo Content mới dựa trên SubCategory.
+    """
     serializer = ContentSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    try:
+        if serializer.is_valid(raise_exception=True):  
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+    except serializers.ValidationError as e:
+        return Response({"errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response(
+            {"errors": "Something went wrong.", "details": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+@swagger_auto_schema(
+    method='get',
+    responses={
+        200: openapi.Response("List of all Content", ContentSerializer(many=True)),
+        500: openapi.Response("Internal Server Error"),
+    }
+)
+@api_view(['GET'])
+def content_get_all(request):
+    """
+    API để lấy tất cả Content.
+    """
+    try:
+        contents = Content.objects.all()
+        serializer = ContentSerializer(contents, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {"errors": "Something went wrong.", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    
 @swagger_auto_schema(
     method='get',
     responses={200: CommentSerializer(many=True), 404: "Content not found"}

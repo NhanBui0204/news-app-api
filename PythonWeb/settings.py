@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-^&*o-i%*@q%zks&c&l5))(n2f3#bcxh@xa-0jsa^&4v2y$uz7z
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost']
 
 
 # Application definition
@@ -95,6 +95,8 @@ DATABASES = {
 
 
 AUTH_USER_MODEL = 'home.User'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -142,6 +144,7 @@ JWT_REFRESH_TOKEN_EXP = config('JWT_REFRESH_TOKEN_EXP', cast=int)
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",  
-# ]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  
+]
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
