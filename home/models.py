@@ -26,7 +26,7 @@ class User( AbstractUser):
 
 class Category(models.Model):
     # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     created_date = models.DateTimeField(default=timezone.now)
     updated_date = models.DateTimeField(auto_now=True)
@@ -37,12 +37,12 @@ class Category(models.Model):
 
 class SubCategory(models.Model):
     # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
-    sub = models.CharField(max_length=255, null=False)
-    description = models.TextField(null=True, blank=True)
+    sub = models.CharField(max_length=255)
+    description = models.TextField()
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
+    category = models.ForeignKey(Category, related_name='subcategories', on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.sub} ({self.category.name if self.category else 'No Category'})"
